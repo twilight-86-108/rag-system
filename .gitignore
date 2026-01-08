@@ -1,0 +1,16 @@
+# Python
+__pycache__
+*.__pycache__
+venv/
+.env
+
+# Vector Store
+chroma_db/
+
+# Data
+data/*.pdf
+data/*.txt
+
+# IDE
+.vscode/
+.idea/
