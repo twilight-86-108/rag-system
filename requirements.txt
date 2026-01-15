@@ -1,0 +1,15 @@
+# LLM Framework
+langchain==1.2.3
+langchain-ollama==1.0.1
+
+# Vector Store
+chromadb==1.4.0
+
+# Embeddings
+sentence-transformers==5.2.0
+
+# UI Framework
+streamlit==1.52.2
+
+# Ollama Client
+ollama==0.6.1
