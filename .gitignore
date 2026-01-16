@@ -1,16 +1,41 @@
 # Python
-__pycache__
-*.__pycache__
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 venv/
+env/
+ENV/
 .env
+*.egg-info/
+dist/
+build/
 
 # Vector Store
 chroma_db/
+*.db
+*.sqlite3
 
-# Data
+# Data files
 data/*.pdf
 data/*.txt
+data/*.csv
+!data/.gitkeep
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Streamlit
+.streamlit/secrets.toml

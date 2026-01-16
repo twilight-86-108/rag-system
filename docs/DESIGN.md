@@ -44,7 +44,7 @@ This project's RAG requires a balance between security, compliance, and performa
 - LangChain 1.0:安定性
 - Ollama 0.6.1:最新API対応
 - ChromaDB 1.4.0: 安定版、後方互換性あり
- 
+
 ## Technical Stack
 
 - LLM: Ollama (llama3.1:8b)
