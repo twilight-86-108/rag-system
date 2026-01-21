@@ -14,6 +14,7 @@ from langchain_core.documents import Document
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 class EmbeddingConfig:
     """
     Embedding生成の設定を管理
@@ -23,6 +24,7 @@ class EmbeddingConfig:
         model_kwargs: モデル初期化のパラメータ
         encode_kwargs: エンコード時のパラメータ
     """
+
     # デフォルトモデル
     DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
@@ -30,7 +32,7 @@ class EmbeddingConfig:
         self,
         model_name: str = DEFAULT_MODEL,
         device: str = "cpu",
-        normalize_embeddings: bool = True
+        normalize_embeddings: bool = True,
     ):
         """
         Arguments:
@@ -39,19 +41,21 @@ class EmbeddingConfig:
             normalize_embeddings: ベクトル正規化するか
         """
         self.model_name = model_name
-        self.model_kwargs = {'device': device}
-        self.encode_kwargs = {'normalize_embeddings': normalize_embeddings}
+        self.model_kwargs = {"device": device}
+        self.encode_kwargs = {"normalize_embeddings": normalize_embeddings}
 
         logger.info(
             f"EmbeddingConfig initialized: model={model_name},"
             f"device={device}, normalize={normalize_embeddings}"
         )
-    
 
-def create_embeddings(config: Optional[EmbeddingConfig] = None) -> HuggingFaceEmbeddings:
+
+def create_embeddings(
+    config: Optional[EmbeddingConfig] = None,
+) -> HuggingFaceEmbeddings:
     """
     HuggingFaceEmbeddingsインスタンスを作成
-    
+
     Arguments:
         config: Embedding設定
     Returns:
@@ -79,16 +83,17 @@ class VectorStoreConfig:
     Attributes:
         collection_name: ChromaDBのコレクション名
         persist_directory: 永続化ディレクトリパス
-        distance_metric: 距離計算方法 
+        distance_metric: 距離計算方法
     """
+
     DEFAULT_COLLECTION = "rag_docs"
     DEFAULT_PERSIST_DIR = "./chroma_db"
 
     def __init__(
-        self, 
+        self,
         collection_name: str = DEFAULT_COLLECTION,
         persist_directory: str = DEFAULT_PERSIST_DIR,
-        distance_metric: str = "cosine"
+        distance_metric: str = "cosine",
     ):
         """
         Arguments:
@@ -109,15 +114,16 @@ class VectorStoreConfig:
             f"persidt_dir={persist_directory}, metric=distance_metric"
         )
 
-    
+
 class VectorStoreManager:
     """
     ChromaDB Vector Storeの作成・管理を担当
     """
+
     def __init__(
-        self, 
+        self,
         embedding_config: Optional[EmbeddingConfig] = None,
-        vectorstore_config: Optional[VectorStoreConfig] = None
+        vectorstore_config: Optional[VectorStoreConfig] = None,
     ):
         """
         Arguments:
@@ -129,11 +135,9 @@ class VectorStoreManager:
         self.embeddings = create_embeddings(self.embedding_config)
 
         logger.info("VectorStoreManager initialized")
-    
+
     def create_vectorstore(
-        self,
-        documents: List[Document],
-        collection_name: Optional[str] = None
+        self, documents: List[Document], collection_name: Optional[str] = None
     ) -> Chroma:
         """
         ドキュメントからChromaDB Vector Storeを作成
@@ -141,15 +145,15 @@ class VectorStoreManager:
         Arguments:
             documents: 買う脳するDocumentリスト（チャンク済み）
             collection_name: コレクション名
-        
+
         Returns:
             Chroma: 作成されたVector Store
         """
         # documentがないとき
         if not documents:
-            logger.watning("No documents to add to vector store")
+            logger.warning("No documents to add to vector store")
             return None
-        
+
         # collection_name決定
         collection_name = collection_name or self.vectorstore_config.collection_name
 
@@ -174,10 +178,7 @@ class VectorStoreManager:
         # Vector Storeを返却
         return vectorstore
 
-    def load_vectorstore(
-        self,
-        collecrion_name: Optional[str] = None
-    ) -> Chroma:
+    def load_vectorstore(self, collection_name: Optional[str] = None) -> Chroma:
         """
         既存のVectore Storeを読み込み
 
@@ -186,12 +187,12 @@ class VectorStoreManager:
 
         Returns:
             Chroma: 読み込まれたVector Store
-        
+
         Raises:
             ValueError: コレクションが存在しない
         """
         # collection_name決定
-        collection_name = collecrion_name or self.vectorstore_config.collection_name
+        collection_name = collection_name or self.vectorstore_config.collection_name
 
         logger.info(f"Loading existing vector store: {collection_name}")
         # Chromaインスタンス作成
@@ -210,33 +211,27 @@ class VectorStoreManager:
             )
             # Vector Storeを返却
             return vectorstore
-        
+
         except Exception as e:
             logger.error(f"Failed to load vector store: {e}")
             raise ValueError(
-                f"Collection '{collecrion_name}' not found or invalid."
-                f"Persist directiry: {self.vectordtore_config.persist_directory}"
+                f"Collection '{collection_name}' not found or invalid."
+                f"Persist directiry: {self.vectorstore_config.persist_directory}"
             )
-    
-    def add_documents(
-        self, 
-        vectorstore: Chroma,
-        documents: List[Document]
-    ) -> None:
+
+    def add_documents(self, vectorstore: Chroma, documents: List[Document]) -> None:
         """
         既存のVector Storeにドキュメントを追加
 
         Arguments:
-            vectorstore: 追加先のVector Store        
+            vectorstore: 追加先のVector Store
             documents: 追加するDocumentリスト
         """
         pass
 
 
 def test_vectorstore_search(
-    vectorstore: Chroma,
-    query: str,
-    k: int = 3
+    vectorstore: Chroma, query: str, k: int = 3
 ) -> List[Document]:
     """
     Vector Storeの検索機能をテスト
@@ -260,7 +255,7 @@ def test_vectorstore_search(
         print(f"Content: {doc.page_content[:200]}...")
         print(f"Metadata: {doc.metadata}")
         print("Score: (simikarity_search doesn't return scores by default)\n")
-    
+
     return results
 
 
@@ -284,10 +279,11 @@ if __name__ == "__main__":
         vectorstore = vectorstore_manager.create_vectorstore(chunks)
 
         print("Vector Store created successfully!")
-    
+
     except Exception as e:
         print(f"Test 1 failed: {e}\n")
         import traceback
+
         traceback.print_exc()
 
     # 検索テスト（日本語）
@@ -296,17 +292,17 @@ if __name__ == "__main__":
         query_jp = "RAGシステムとはなんですか？"
         results_jp = test_vectorstore_search(vectorstore, query_jp, k=3)
         print(f"Japanese search returned {len(results_jp)} results")
-    
+
     except Exception as e:
         print(f"Test 2 failed: {e}\n")
-    
+
     # 検索テスト（英語）
     print("Test 3")
     try:
         query_en = "What is the RAG system?"
         results_en = test_vectorstore_search(vectorstore, query_en, k=3)
         print(f"english search returned {len(results_en) } results")
-    
+
     except Exception as e:
         print(f"Test 3 failed: {e}\n")
 
@@ -320,8 +316,8 @@ if __name__ == "__main__":
         results_loaded = test_vectorstore_search(vectorstore_loaded, query_test, k=2)
 
         print(f"Loaded {len(results_loaded)} results")
-    
+
     except Exception as e:
         print(f"Test 4 failed: {e}\n")
-    
+
     print("All tests completed.")

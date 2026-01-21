@@ -4,7 +4,11 @@ import logging
 
 # LangChain
 from langchain_ollama import ChatOllama
-from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate,HumanMessagePromptTemplate
+from langchain_core.prompts import (
+    ChatPromptTemplate,
+    SystemMessagePromptTemplate,
+    HumanMessagePromptTemplate,
+)
 from langchain_core.messages import BaseMessage
 from sqlalchemy.orm import context
 
@@ -12,24 +16,26 @@ from sqlalchemy.orm import context
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 class LLMConfig:
     """
     LLMの設定を管理
 
-    Atributes:
+    Attributes:
         model: 使用するOllamaのモデル名
         temperature: 生成のランダム性
         base_url: OllamaサーバーのURL
         timeout: タイムアウト時間
     """
+
     DEFAULT_MODEL = "llama3.1:8b"
 
     def __init__(
-        self, 
+        self,
         model: str = DEFAULT_MODEL,
         temperature: float = 0.0,
         base_url: str = "http://localhost:11434",
-        timeout: int = 120
+        timeout: int = 120,
     ):
         """
         Arguments:
@@ -53,10 +59,10 @@ class LLMConfig:
         設定を辞書形式で返す
         """
         return {
-            'model': self.model,
-            'temperature': self.temperature,
-            'base_url': self.base_url,
-            'timeout': self.timeout,
+            "model": self.model,
+            "temperature": self.temperature,
+            "base_url": self.base_url,
+            "timeout": self.timeout,
         }
 
 
@@ -66,7 +72,7 @@ def create_llm(config: Optional[LLMConfig] = None) -> ChatOllama:
 
     Arguments:
         config: LLM設定（Noneならデフォルト）
-    
+
     Returns:
         ChatOllama: 設定済みLLMインスタンス
     """
@@ -84,6 +90,7 @@ def create_llm(config: Optional[LLMConfig] = None) -> ChatOllama:
     logger.info(f"Created ChatOllama with model: {config.model}")
     # 作成したllm（ChatOllamaインスタンス）を返却
     return llm
+
 
 RAG_SYSTEM_PROMPT = """
 あなたは、提供された文書に基づいて質問に回答するAIアシスタントです。
@@ -108,6 +115,7 @@ RAG_HUMAN_TEMPLATE = """
 回答：
 """
 
+
 def create_rag_prompt() -> ChatPromptTemplate:
     """
     RAG用のChatPromptTemplateを作成
@@ -120,29 +128,39 @@ def create_rag_prompt() -> ChatPromptTemplate:
     # HumanMessagePromptTemplateを作成
     human_message = HumanMessagePromptTemplate.from_template(RAG_HUMAN_TEMPLATE)
     # ChatPromptTemplate.from_messages()で結合
-    prompt = ChatPromptTemplate.from_messages([
-        system_message,
-        human_message,
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            system_message,
+            human_message,
+        ]
+    )
     # logging
     logger.info("Created RAG prompt template with system and human messages")
 
     return prompt
 
+
 class LLMManager:
     """
     LLMの作成と管理を担当
     """
+
     def __init__(
         self,
         config: Optional[LLMConfig] = None,
+        model: str = LLMConfig.DEFAULT_MODEL,
+        temperature: float = 0.0,
+        base_url: str = "http://localhost:11434",
     ):
         """
         Arguments:
-            config: LLM設定
+            config: LLM設定 (優先)
+            model: (configがない場合に使用)
+            temperature: (configがない場合に使用)
+            base_url: (configがない場合に使用)
         """
         if config is None:
-            config = LLMConfig()
+            config = LLMConfig(model=model, temperature=temperature, base_url=base_url)
         self.config = config
         self.llm = create_llm(config)
 
@@ -150,7 +168,7 @@ class LLMManager:
             f"LLMManager initialized with model: {config.model},"
             f"temperature: {config.temperature}"
         )
-    
+
     def get_llm(self) -> ChatOllama:
         """
         LLMインスタンスを取得
@@ -159,17 +177,17 @@ class LLMManager:
             ChatOllama: 設定済みLLM
         """
         return self.llm
-    
+
     def test_llm(self, test_message: str = "Hello, how are you?") -> str:
         """
         LLMの動作確認テスト
 
         Arguments:
             test_message: テストメッセージ
-        
+
         Returns:
             str: LLMからの回答
-        
+
         Raises:
             Exception: Ollamaサーバーが未起動、モデル未ダウンロードなど
         """
@@ -183,7 +201,7 @@ class LLMManager:
             logger.info(f"LLM response received: {len(response_text)} chars")
 
             return response_text
-        
+
         except Exception as e:
             logger.error(f"LLM test failed: {e}")
             raise
@@ -195,22 +213,22 @@ def format_context_from_docs(documents: List) -> str:
 
     Arguments:
         documents: Vector Storeからの検索結果
-    
+
     Returns:
         str: プロンプトに注入するコンテキスト文字列
     """
     if not documents:
         return "関連する文書が見つかりませんでした。"
-    
+
     context_parts = []
 
     for i, doc in enumerate(documents, 1):
         context_parts.append(f"===Document {i}===")
         context_parts.append(doc.page_content)
-        source = doc.metadata.get('source', 'Unknown')
+        source = doc.metadata.get("source", "Unknown")
         context_parts.append(f"Source: {source}")
         context_parts.append("")
-    
+
     return "\n".join(context_parts)
 
 
@@ -221,12 +239,13 @@ if __name__ == "__main__":
         llm_manager = LLMManager()
         response = llm_manager.test_llm("こんにちは")
         print(f"LLM Response: {response}\n")
-    
+
     except Exception as e:
         print(f"Test 1 failed: {e}")
         import traceback
+
         traceback.print_exc()
-    
+
     # プロンプトテンプレート
     print("Test 2")
     try:
@@ -240,20 +259,20 @@ if __name__ == "__main__":
         sample_question = "RAGとはなにか簡潔に説明して。"
 
         formatted_messeges = prompt.format_messages(
-            context=sample_context,
-            question=sample_question
+            context=sample_context, question=sample_question
         )
-        
+
         print("\nFormatted Prompt:")
         for i, msg in enumerate(formatted_messeges, 1):
             print(f"\nMessage {i}({msg.__class__.__name__})")
             print(msg.content)
-        
+
     except Exception as e:
         print(f"Test 2 failed: {e}\n")
         import traceback
+
         traceback.print_exc()
-    
+
     # 簡易RAGシミュレーション
     print("Test 3")
     try:
@@ -265,10 +284,9 @@ if __name__ == "__main__":
 
         chain = prompt | llm
 
-        response = chain.invoke({
-            "context": sample_context,
-            "question": sample_question
-        })
+        response = chain.invoke(
+            {"context": sample_context, "question": sample_question}
+        )
 
         print(f"\nRAG Response: {response.content}")
         print()
@@ -276,6 +294,7 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Test 3 failed: {e}\n")
         import traceback
+
         traceback.print_exc()
 
     # Context Formatting
@@ -286,11 +305,11 @@ if __name__ == "__main__":
         mock_docs = [
             Document(
                 page_content="RAGは検索拡張生成と呼ばれる技術です。",
-                metadata={'source': 'data\sample_tech_doc.txt', 'chunk_index': 0}
+                metadata={"source": "data\sample_tech_doc.txt", "chunk_index": 0},
             ),
             Document(
                 page_content="ベクトルデータベースを使用して類似文書を検索します。",
-                metadata={'source': 'data/sample_tech_doc.txt', 'chunk_index': 5}
+                metadata={"source": "data/sample_tech_doc.txt", "chunk_index": 5},
             ),
         ]
 
@@ -298,10 +317,11 @@ if __name__ == "__main__":
 
         print("\nFormatted Context:")
         print(context_formatted)
-    
+
     except Exception as e:
         print(f"Test 4 failed: {e}\n")
         import traceback
+
         traceback.print_exc()
 
     print("\nAll tests completed.\n")
