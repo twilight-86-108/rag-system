@@ -1,5 +1,14 @@
-from typing import List, Dict, Any, Optional
+import sys
+import os
+from typing import List, Dict, Any, Optional, Generator
 import logging
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(os.path.dirname(current_dir))  # src/rag -> src
+if "rag" not in sys.modules:
+    src_dir = os.path.dirname(current_dir)
+    if src_dir not in sys.path:
+        sys.path.insert(0, src_dir)
 
 # LangChain
 from langchain_core.documents import Document
@@ -202,6 +211,65 @@ class RAGPipeline:
         # return
         return result
 
+    def query_stream(self, question: str) -> Generator[str, None, None]:
+        """
+        ストリーミング応答を生成
+
+        Arguments:
+            question: ユーザの質問
+
+        Yields:
+            str: 生成されたテキストチャンク
+        """
+        logger.info(f"Processing query stream: '{question}'")
+        try:
+            for chunk in self.chain.stream(question):
+                yield chunk
+
+        except Exception as e:
+            logger.error(f"Query stream failed: {e}")
+            raise
+
+    def query_stream_with_sources(self, question: str) -> Dict[str, Any]:
+        """
+        ソース取得後、ストリーミング応答を生成する
+
+        Arguments:
+            question: ユーザの質問
+
+        Returns:
+            dict: {
+                'stream': Generator[str, None, None], # ストリーミング応答
+                'sources': List[Document] # 参照ドキュメント
+            }
+        """
+        logger.info(f"Processing query stream with sources: '{question}'")
+        try:
+            # 文書取得
+            source_docs = self._retrieve_documents(question)
+
+            # ストリーミング生成
+            stream = self.query_stream(question)
+
+            # 結果
+            result = {
+                "stream": stream,
+                "sources": source_docs,
+                "num_sources": len(source_docs),
+            }
+
+            # ログ
+            logger.info(
+                f"Query stream with sources completed with {len(source_docs)} sources"
+            )
+
+            # return
+            return result
+
+        except Exception as e:
+            logger.error(f"Query stream with sources failed: {e}")
+            raise
+
     @classmethod
     def from_existing_vectorstore(
         cls,
@@ -231,7 +299,7 @@ class RAGPipeline:
             retriever_config=retriever_config,
         )
 
-        logger.info("RAGPipeline creted successfully")
+        logger.info("RAGPipeline created successfully")
 
         return pipeline
 
@@ -345,3 +413,21 @@ if __name__ == "__main__":
         traceback.print_exc()
 
     print("All Testing Completed")
+
+    # ストリーミング応答
+    print("Test 5")
+    try:
+        question = "RAGシステムの利点を3つ教えて"
+        print(f"\nQuestion: {question}")
+        print("\nStreaming Response:")
+
+        for chunk in pipeline.query_stream(question):
+            print(chunk, end="", flush=True)
+
+        print("\n")
+
+    except Exception as e:
+        print(f"Test 5 failed: {e}")
+        import traceback
+
+        traceback.print_exc()

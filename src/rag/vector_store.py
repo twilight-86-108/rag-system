@@ -157,6 +157,20 @@ class VectorStoreManager:
         # collection_name決定
         collection_name = collection_name or self.vectorstore_config.collection_name
 
+        import chromadb
+
+        try:
+            client = chromadb.PersistentClient(
+                path=self.vectorstore_config.persist_directory
+            )
+            try:
+                client.delete_collection(collection_name)
+                logger.info(f"Deleted existing collection: {collection_name}")
+            except ValueError:
+                pass  # Collection didn't exist
+        except Exception as e:
+            logger.warning(f"Failed to clear collection: {e}")
+
         logger.info(
             f"Creating vector store with {len(documents)} documents"
             f"in collection '{collection_name}'..."
