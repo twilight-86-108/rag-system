@@ -297,12 +297,35 @@ def render_qa_interface():
     if ask_button and question:
         with st.spinner("考え中..."):
             try:
+                """
                 if show_sources:
                     result = st.session_state.rag_pipeline.query_with_sources(question)
                     answer = result["answer"]
                     sources = result["sources"]
                 else:
                     answer = st.session_state.rag_pipeline.query_with_sources(question)
+                    sources = []
+
+                st.session_state.chat_history.append(
+                    {"question": question, "answer": answer, "sources": sources}
+                )
+                """
+                st.markdown("**質問**")
+                st.write(question)
+
+                st.markdown("**回答**")
+
+                if show_sources:
+                    result = st.session_state.rag_pipeline.query_stream_with_sources(
+                        question
+                    )
+                    sources = result["sources"]
+                    stream = result["stream"]
+
+                    answer = st.write_stream(stream)
+                else:
+                    stream = st.session_state.rag_pipeline.query_stream(question)
+                    answer = st.write_stream(stream)
                     sources = []
 
                 st.session_state.chat_history.append(
