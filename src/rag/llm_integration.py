@@ -8,9 +8,9 @@ from langchain_core.prompts import (
     ChatPromptTemplate,
     SystemMessagePromptTemplate,
     HumanMessagePromptTemplate,
+    MessagesPlaceholder
 )
 from langchain_core.messages import BaseMessage
-from sqlalchemy.orm import context
 
 # logging
 logging.basicConfig(level=logging.INFO)
@@ -107,6 +107,18 @@ RAG_SYSTEM_PROMPT = """
 - 質問: ユーザーからの具体的な質問
 """
 
+RAG_SYSTEM_PROMPT_WITH_HISTORY = """
+あなたは、提供された文書に基づいて質問に回答するAIアシスタントです。
+以下のルールを厳守してください：
+
+1. **文書ベース回答**: 提供されたコンテキスト（文書）の情報のみを使用して回答してください。
+2. **不明な場合の対応**: 提供された文書に情報がない場合は、「提供された文書には、その情報が含まれていません」と正直に答えてください。
+3. **会話の継続性**: 過去の会話履歴を考慮し、「それ」「これ」などの指示語が何を指すか理解して回答してください。
+4. **引用の推奨**: 可能な限り、どの文書から情報を得たかを示してください。
+5. **簡潔な回答**: 質問に対して簡潔かつ正確に答えてください。
+6. **日本語対応**: 日本語の質問には日本語で、英語の質問には英語で回答してください。
+"""
+
 RAG_HUMAN_TEMPLATE = """
 コンテキスト：{context}
 
@@ -115,6 +127,13 @@ RAG_HUMAN_TEMPLATE = """
 回答：
 """
 
+RAG_HUMAN_TEMPLATE_WITH_HISTORY = """
+コンテキスト: {context}
+
+質問: {question}
+
+回答: 
+"""
 
 def create_rag_prompt() -> ChatPromptTemplate:
     """
@@ -139,6 +158,24 @@ def create_rag_prompt() -> ChatPromptTemplate:
 
     return prompt
 
+def create_rag_prompt_with_history() -> ChatPromptTemplate:
+    """
+    会話履歴対応のRAG用ChatPromptTemplateを作成
+
+    Returns:
+        ChatPromptTemplate: システム + 履歴 + ユーザー入力
+    """
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", RAG_SYSTEM_PROMPT_WITH_HISTORY),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", RAG_HUMAN_TEMPLATE_WITH_HISTORY),
+        ]
+    )
+
+    logger.info("Created RAG prompt template with chat history support")
+
+    return prompt
 
 class LLMManager:
     """

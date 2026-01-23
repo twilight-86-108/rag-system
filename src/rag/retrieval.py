@@ -12,8 +12,11 @@ if "rag" not in sys.modules:
 
 # LangChain
 from langchain_core.documents import Document
-from langchain_core.runnables import RunnablePassthrough
+from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.chat_history import BaseChatMessageHistory
+from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_community.chat_message_histories import ChatMessageHistory
 
 from rag.vector_store import VectorStoreManager
 from rag.llm_integration import LLMManager, create_rag_prompt, format_context_from_docs
@@ -86,6 +89,9 @@ class RAGPipeline:
         self.prompt = create_rag_prompt()
         self.llm = llm_manager.get_llm()
         self.chain = self._create_rag_chain()
+
+        self.chat_histories: Dict[str, ChatMessageHistory] = {}
+        self.chain_with_history = self._create_chain_with_history()
 
         logger.info("RAGPipeline initialized successfully.")
 
@@ -270,6 +276,156 @@ class RAGPipeline:
             logger.error(f"Query stream with sources failed: {e}")
             raise
 
+    def query_with_history(
+        self, question: str, session_id: str = "default"
+    ) -> str:
+        """
+        会話履歴を考慮した質問応答
+
+        Arguments:
+            question: ユーザの質問
+            session_id: セッションID
+        
+        Returns: 
+            str: LLMからの応答
+        """
+        logger.info(f"Processing query with history: '{question}' (session: {session_id})")
+
+        try:
+            response = self.chain_with_history.invoke(
+                {"question": question},
+                config={"configurable": {"session_id": session_id}},
+            )
+
+            logger.info(f"Response with history generated: {len(response)} chars")
+
+            return response
+        
+        except Exception as e:
+            logger.error(f"Query with history failed: {e}")
+            raise
+    
+    def query_stream_with_history(
+        self, question: str, session_id: str = "default"
+    ) -> Generator[str, None, None]:
+        """
+        会話履歴を考慮したストリーミング応答
+
+        Arguments:
+            question: ユーザの質問
+            session_id: セッションID
+        
+        Yields:
+            str: 生成されたテキストチャンク
+        """
+        logger.info(f"Processing query stream with history: '{question}' (session: {session_id})")
+
+        try:
+            for chunk in self.chain_with_history.stream(
+                {"question": question},
+                config={"configurable": {"session_id": session_id}},
+            ):
+                yield chunk
+        
+        except Exception as e:
+            logger.error(f"Query stream with history failed: {e}")
+            raise
+
+    def clear_history(self, session_id: str = "default") -> None:
+        """
+        指定セッションの会話履歴をクリア
+
+        Arguments:
+        session_id: クリア対象のセッションID
+        """
+        if session_id in self.chat_histories:
+            self.chat_histories[session_id].clear()
+            logger.info(f"Cleares chat history for session: {session_id}")
+        else:
+            logger.warning(f"No histor found for session: {session_id}")
+
+    
+    def _get_session_history(self, session_id: str) -> BaseChatMessageHistory:
+        """
+        セッションIDに対応する会話履歴を取得（なければ新規作成）
+        Arguments:
+            sesson_id: セッションID
+        
+        Returns:
+            BaseChatMessageHistory: 会話履歴オブジェクト
+        """
+        if session_id not in self.chat_histories:
+            self.chat_histories[session_id] = ChatMessageHistory()
+            logger.info(f"Created new chat history for session: {session_id}")
+
+        return self.chat_histories[session_id]
+
+    def _create_chain_with_history(self):
+        """
+        会話履歴対応のRAGチェーンを作成
+
+        Returns: 
+            RunnnableWithMessageHistory: 履歴管理付きチェーン
+        """
+        from rag.llm_integration import create_rag_prompt_with_history
+        
+        prompt_with_history = create_rag_prompt_with_history()
+        
+        def format_docs(docs):
+            return format_context_from_docs(docs)
+
+        def extract_question(x):
+            """
+            入力からquestionキーの値を文字列として抽出
+            """
+            if isinstance(x, dict):
+                question = x.get("question", "")
+                if hasattr(question, "content"):
+                    return question.content
+                return str(question) if question else ""
+            return str(x) if x else ""
+
+        def extract_question_for_prompt(x):
+            """
+            プロンプト用にquestionキーを抽出（文字列またはBaseMessageオブジェクトから）
+            """
+            if isinstance(x, dict):
+                question = x.get("question", "")
+                if hasattr(question, "content"):
+                    return question.content
+                return str(question) if question else ""
+            return str(x) if x else ""
+
+        def extract_chat_history(x):
+            """
+            入力辞書からchat_historyキーを抽出
+            """
+            if isinstance(x, dict):
+                return x.get("chat_history", [])
+            return []
+
+        base_chain = (
+            {
+                "context": RunnableLambda(extract_question) | self.retriever | format_docs,
+                "question": RunnableLambda(extract_question_for_prompt),
+                "chat_history": RunnableLambda(extract_chat_history),
+            }
+            | prompt_with_history
+            | self.llm
+            | StrOutputParser()
+        )
+
+        chain_with_history = RunnableWithMessageHistory(
+            base_chain,
+            self._get_session_history,
+            input_messages_key="question",
+            history_messages_key="chat_history",
+        )
+
+        logger.info("Created RAG chain with message history")
+        
+        return chain_with_history
+
     @classmethod
     def from_existing_vectorstore(
         cls,
@@ -431,3 +587,23 @@ if __name__ == "__main__":
         import traceback
 
         traceback.print_exc()
+
+    # 会話履歴付き応答
+    print("Test 6")
+    try:
+        print("Q: RAGシステムの概要を教えて")
+        print("A: ", end="")
+        for chunk in pipeline.query_stream_with_history("RAGシステムの概要を教えて", session_id="stream_test"):
+            print(chunk, end="", flush=True)
+        print("\n")
+
+        print("Q: もっと簡潔に")
+        print("A: ", end="")
+        for chunk in pipeline.query_stream_with_history("もっと簡潔に", session_id="stream_test"):
+            print(chunk, end="", flush=True)
+        print("\n")
+
+    except Exception as e:
+        print(f"Test 6 failed: {e}")
+        import traceback
+        traceback.print_exc() 
