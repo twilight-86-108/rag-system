@@ -34,6 +34,9 @@ def init_session_state():
         st.session_state.uploaded_files = []
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
+    if "session_id" not in st.session_state:
+        import uuid
+        st.session_state.session_id = str(uuid.uuid4())
 
 
 def render_header():
@@ -292,39 +295,36 @@ def render_qa_interface():
 
     if clear_button:
         st.session_state.chat_history = []
+
+        if st.session_state.rag_pipeline:
+            st.session_state.rag_pipeline.clear_history(st.session_state.session_id)
+
         st.rerun()
 
     if ask_button and question:
         with st.spinner("考え中..."):
             try:
-                """
-                if show_sources:
-                    result = st.session_state.rag_pipeline.query_with_sources(question)
-                    answer = result["answer"]
-                    sources = result["sources"]
-                else:
-                    answer = st.session_state.rag_pipeline.query_with_sources(question)
-                    sources = []
-
-                st.session_state.chat_history.append(
-                    {"question": question, "answer": answer, "sources": sources}
-                )
-                """
                 st.markdown("**質問**")
                 st.write(question)
 
                 st.markdown("**回答**")
 
                 if show_sources:
-                    result = st.session_state.rag_pipeline.query_stream_with_sources(
-                        question
+                    # 取得
+                    source_docs = st.session_state.rag_pipeline._retrieve_documents(question)
+                    # 会話履歴 + ストリーミング
+                    stream = st.session_state.rag_pipeline.query_stream_with_history(
+                        question,
+                        session_id=st.session_state.session_id
                     )
-                    sources = result["sources"]
-                    stream = result["stream"]
-
                     answer = st.write_stream(stream)
+                    sources = source_docs
                 else:
-                    stream = st.session_state.rag_pipeline.query_stream(question)
+                    # 会話履歴 + ストリーミング (ソースなし)
+                    stream = st.session_state.rag_pipeline.query_stream_with_history(
+                        question,
+                        session_id=st.session_state.session_id
+                    )
                     answer = st.write_stream(stream)
                     sources = []
 
@@ -338,6 +338,7 @@ def render_qa_interface():
 
                 with st.expander("エラー詳細"):
                     st.code(traceback.format_exc())
+
     if st.session_state.chat_history:
         st.divider()
         st.subheader("会話履歴")
